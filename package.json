@@ -1,7 +1,7 @@
 {
   "name": "victorian-council-bin-lookup",
   "version": "1.0.0",
-  "description": "Local MCP server for Victorian council bin collection lookup.",
+  "description": "MCP and HTTP server for Victorian council bin collection lookup.",
   "type": "module",
   "bin": {
     "victorian-council-bin-lookup": "./server.js"

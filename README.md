@@ -18,7 +18,7 @@ The server is designed to grow council-by-council, using small adapters for each
 - Returns structured MCP output for AI agents
 - Handles council-specific address formatting
 - No OpenAI API key required
-- Runs locally over MCP stdio
+- Runs locally over MCP stdio or remotely over HTTP
 
 ## Install
 
@@ -101,20 +101,99 @@ curl -X POST "http://localhost:3000/mcp" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1.0.0"}}}'
 ```
 
-## Deploy to Azure Container Apps
+## Deploy to Azure App Service
 
-The included `Dockerfile` runs the HTTP server, so the project can be deployed to Azure Container Apps.
+Azure App Service is the recommended Azure deployment path for this project. It avoids Azure Container Registry build tasks and runs the HTTP MCP endpoint with `npm start`.
 
 ```bash
 az login
+az group create \
+  --name victorian-council-bin-lookup-rg \
+  --location australiaeast \
+  --output table
+
+az appservice plan create \
+  --name victorian-council-bin-lookup-plan \
+  --resource-group victorian-council-bin-lookup-rg \
+  --location australiaeast \
+  --sku F1 \
+  --is-linux \
+  --output table
+
+az webapp create \
+  --name victorian-council-bin-lookup \
+  --resource-group victorian-council-bin-lookup-rg \
+  --plan victorian-council-bin-lookup-plan \
+  --runtime "NODE:22-lts" \
+  --startup-file "npm start" \
+  --output table
+```
+
+Deploy from the repository folder:
+
+```bash
+zip -r app.zip . -x ".git/*" "node_modules/*" "app.zip"
+
+az webapp deploy \
+  --name victorian-council-bin-lookup \
+  --resource-group victorian-council-bin-lookup-rg \
+  --src-path app.zip \
+  --type zip
+```
+
+Test the deployed app:
+
+```bash
+curl https://victorian-council-bin-lookup.azurewebsites.net/health
+```
+
+Expected response:
+
+```json
+{"ok":true,"service":"victorian-council-bin-lookup"}
+```
+
+Test the MCP endpoint:
+
+```bash
+curl -X POST "https://victorian-council-bin-lookup.azurewebsites.net/mcp" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+To require an API key:
+
+```bash
+az webapp config appsettings set \
+  --name victorian-council-bin-lookup \
+  --resource-group victorian-council-bin-lookup-rg \
+  --settings API_KEY="replace-with-a-long-random-value"
+```
+
+Then include the key when calling `/mcp` or `/api/bin-collection`:
+
+```bash
+curl -X POST "https://victorian-council-bin-lookup.azurewebsites.net/mcp" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer replace-with-a-long-random-value" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+The App Service deployment runs `npm start`, which starts `http-server.js`.
+
+## Deploy to Azure Container Apps
+
+The included `Dockerfile` can also run this server on Azure Container Apps, but `az containerapp up --source .` uses Azure Container Registry Tasks to build the image. Some subscriptions do not allow ACR Tasks and will fail with `TasksOperationsNotAllowed`.
+
+If your subscription supports ACR Tasks, deploy from the repository folder:
+
+```bash
 az extension add --name containerapp --upgrade
 az provider register --namespace Microsoft.App
 az provider register --namespace Microsoft.OperationalInsights
-```
+az provider register --namespace Microsoft.ContainerRegistry
 
-Create and deploy from the repository folder:
-
-```bash
 az containerapp up \
   --name victorian-council-bin-lookup \
   --resource-group victorian-council-bin-lookup-rg \
@@ -122,49 +201,6 @@ az containerapp up \
   --environment victorian-council-bin-lookup-env \
   --source .
 ```
-
-To require an API key:
-
-```bash
-az containerapp secret set \
-  --name victorian-council-bin-lookup \
-  --resource-group victorian-council-bin-lookup-rg \
-  --secrets api-key="replace-with-a-long-random-value"
-
-az containerapp update \
-  --name victorian-council-bin-lookup \
-  --resource-group victorian-council-bin-lookup-rg \
-  --set-env-vars API_KEY=secretref:api-key
-```
-
-## Deploy to Azure App Service
-
-If Azure Container Apps cannot run ACR Tasks in your subscription, Azure App Service is the simplest non-container fallback.
-
-```bash
-az group create \
-  --name victorian-council-bin-lookup-rg \
-  --location australiaeast
-
-az appservice plan create \
-  --name victorian-council-bin-lookup-plan \
-  --resource-group victorian-council-bin-lookup-rg \
-  --sku B1 \
-  --is-linux
-
-az webapp create \
-  --name victorian-council-bin-lookup \
-  --resource-group victorian-council-bin-lookup-rg \
-  --plan victorian-council-bin-lookup-plan \
-  --runtime "NODE:20-lts"
-
-az webapp up \
-  --name victorian-council-bin-lookup \
-  --resource-group victorian-council-bin-lookup-rg \
-  --runtime "NODE:20-lts"
-```
-
-The App Service deployment runs `npm start`, which starts `http-server.js`.
 
 ## Tool Input
 
