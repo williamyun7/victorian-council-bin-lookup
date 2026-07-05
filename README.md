@@ -64,7 +64,7 @@ The server exposes one MCP tool: `get_bin_collection`.
 For Azure or other hosted environments, run the HTTP entrypoint:
 
 ```bash
-npm run http
+npm start
 ```
 
 By default this listens on port `3000`. You can change it with `PORT`:
@@ -136,6 +136,35 @@ az containerapp update \
   --resource-group victorian-council-bin-lookup-rg \
   --set-env-vars API_KEY=secretref:api-key
 ```
+
+## Deploy to Azure App Service
+
+If Azure Container Apps cannot run ACR Tasks in your subscription, Azure App Service is the simplest non-container fallback.
+
+```bash
+az group create \
+  --name victorian-council-bin-lookup-rg \
+  --location australiaeast
+
+az appservice plan create \
+  --name victorian-council-bin-lookup-plan \
+  --resource-group victorian-council-bin-lookup-rg \
+  --sku B1 \
+  --is-linux
+
+az webapp create \
+  --name victorian-council-bin-lookup \
+  --resource-group victorian-council-bin-lookup-rg \
+  --plan victorian-council-bin-lookup-plan \
+  --runtime "NODE:20-lts"
+
+az webapp up \
+  --name victorian-council-bin-lookup \
+  --resource-group victorian-council-bin-lookup-rg \
+  --runtime "NODE:20-lts"
+```
+
+The App Service deployment runs `npm start`, which starts `http-server.js`.
 
 ## Tool Input
 

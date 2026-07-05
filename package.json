@@ -8,8 +8,10 @@
   },
   "scripts": {
     "http": "node http-server.js",
+    "start": "node http-server.js",
+    "start:stdio": "node server.js",
     "test:call": "node test-client.js",
-    "start": "node server.js"
+    "test:syntax": "node --check server.js && node --check http-server.js && node --check src/lookup.js && node --check src/mcp.js && node --check test-client.js"
   },
   "engines": {
     "node": ">=18"
