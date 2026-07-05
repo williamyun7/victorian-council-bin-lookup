@@ -59,6 +59,84 @@ Use the Victorian Council Bin Lookup MCP tool to check which bins are collected 
 
 The server exposes one MCP tool: `get_bin_collection`.
 
+## Run as an HTTP Server
+
+For Azure or other hosted environments, run the HTTP entrypoint:
+
+```bash
+npm run http
+```
+
+By default this listens on port `3000`. You can change it with `PORT`:
+
+```bash
+PORT=8080 npm run http
+```
+
+HTTP endpoints:
+
+- `GET /health` health check for hosting platforms
+- `POST /mcp` JSON-RPC MCP endpoint
+- `GET /api/bin-collection?address=...&council=auto` simple REST endpoint for testing
+
+Optional environment variables:
+
+- `API_KEY` protects `/mcp` and `/api/bin-collection` with `Authorization: Bearer <key>` or `x-api-key: <key>`
+- `ALLOWED_ORIGINS` comma-separated list of allowed browser origins
+- `PORT` HTTP listen port
+- `HOST` HTTP bind host, defaults to `0.0.0.0` for container hosting
+
+Example REST test:
+
+```bash
+curl "http://localhost:3000/api/bin-collection?address=123%20Demo%20Street%20Exampleville%203999&council=casey"
+```
+
+Example MCP initialize call:
+
+```bash
+curl -X POST "http://localhost:3000/mcp" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1.0.0"}}}'
+```
+
+## Deploy to Azure Container Apps
+
+The included `Dockerfile` runs the HTTP server, so the project can be deployed to Azure Container Apps.
+
+```bash
+az login
+az extension add --name containerapp --upgrade
+az provider register --namespace Microsoft.App
+az provider register --namespace Microsoft.OperationalInsights
+```
+
+Create and deploy from the repository folder:
+
+```bash
+az containerapp up \
+  --name victorian-council-bin-lookup \
+  --resource-group victorian-council-bin-lookup-rg \
+  --location australiaeast \
+  --environment victorian-council-bin-lookup-env \
+  --source .
+```
+
+To require an API key:
+
+```bash
+az containerapp secret set \
+  --name victorian-council-bin-lookup \
+  --resource-group victorian-council-bin-lookup-rg \
+  --secrets api-key="replace-with-a-long-random-value"
+
+az containerapp update \
+  --name victorian-council-bin-lookup \
+  --resource-group victorian-council-bin-lookup-rg \
+  --set-env-vars API_KEY=secretref:api-key
+```
+
 ## Tool Input
 
 `get_bin_collection` accepts:
